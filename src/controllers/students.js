@@ -14,7 +14,7 @@ const find_all_students = async (req, res) => {
     }
 
     if (name) {
-      query += ` AND first_name LIKE '%${name}%'`;
+      query += ` AND (first_name LIKE '%${name}%' OR last_name LIKE '%${name}%')'`;
     }
 
     if (last_name) {
@@ -380,14 +380,14 @@ const registerPaymentCuota = async (req, res) => {
     if (cuota[0].monto_pagado >= cuota[0].monto_a_pagar) {
       return res.status(400).json({
         ok: false,
-        msg: 'La cuota ya ha sido completamente pagada',
+        msg: 'El monto ingreado excede la cuota a pagar',
       });
     }
 
     // Actualizar el monto pagado de la cuota actual
     await db.query(
       `UPDATE cuotas_mensuales
-      SET monto_pagado = monto_a_pagar
+      SET monto_pagado = monto_a_pagar, estado = 'PA'
       WHERE id = ${cuota_id}`
     );
 
