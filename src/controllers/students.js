@@ -412,7 +412,7 @@ const registerPaymentCuota = async (req, res) => {
     );
 
     const student = await db.query(`SELECT * FROM student WHERE student_id = ${cuota[0].student_id}`);
-
+      console.log('finish')
     return res.status(200).json({
       ok: true,
       msg: 'Pago registrado exitosamente',
