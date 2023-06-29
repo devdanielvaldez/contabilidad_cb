@@ -14,7 +14,7 @@ const find_all_students = async (req, res) => {
     }
 
     if (name) {
-      query += ` AND (first_name LIKE '%${name}%' OR last_name LIKE '%${name}%')'`;
+      query += ` AND first_name LIKE '%${name}%'`;
     }
 
     if (last_name) {
@@ -180,6 +180,9 @@ const registerInscription = async (req, res) => {
     return res.status(200).json({
       ok: true,
       msg: 'Inscripción registrada exitosamente',
+      student: student[0],
+      monto: monto == null ? student[0].inscripcion_monto : monto,
+      pagado: pagado
     });
   } catch (err) {
     console.log('Error in registerInscription:', err);
@@ -215,8 +218,10 @@ const getStudentPayments = async (req, res) => {
     // Calcular monto pagado y monto pendiente de pago
     let montoPagado = 0;
     cuotasMensuales.forEach((cuota) => {
-      const montoPagadoCuota = parseInt(cuota.monto_pagado);
+      const montoPagadoCuota = parseFloat(cuota.monto_pagado) || 0;
       montoPagado += montoPagadoCuota;
+      const montoAPagarCuota = parseFloat(cuota.monto_a_pagar) || 0;
+      cuota.pendiente_de_pago = montoAPagarCuota - montoPagadoCuota;
     });
 
     const montoPendiente = cuotasMensuales.reduce((total, cuota) => {
@@ -349,6 +354,9 @@ const registerPaymentAbono = async (req, res) => {
     return res.status(200).json({
       ok: true,
       msg: 'Abono registrado exitosamente',
+      student: student[0],
+      monto: monto,
+      concepto: concepto
     });
   } catch (err) {
     console.log('Error in registerPayment:', err);
@@ -362,7 +370,7 @@ const registerPaymentAbono = async (req, res) => {
 
 const registerPaymentCuota = async (req, res) => {
   try {
-    const { cuota_id } = req.body;
+    const { cuota_id, monto } = req.body;
 
     // Verificar si la cuota existe
     const cuota = await db.query(
@@ -376,24 +384,40 @@ const registerPaymentCuota = async (req, res) => {
       });
     }
 
-    // Verificar si la cuota ya ha sido completamente pagada
-    if (cuota[0].monto_pagado >= cuota[0].monto_a_pagar) {
+    // Calcular el monto pendiente de pago
+    const montoPendiente = cuota[0].monto_a_pagar - cuota[0].monto_pagado;
+
+    // Verificar si el monto ingresado es mayor al monto pendiente de pago
+    if (monto > montoPendiente) {
+      const extra = monto - montoPendiente;
       return res.status(400).json({
         ok: false,
-        msg: 'El monto ingreado excede la cuota a pagar',
+        msg: `El monto ingresado es mayor al monto pendiente de pago en la cuota. Debe realizar un abono de $${extra} para poder continuar.`,
+      });
+    }
+
+    // Verificar si el monto ingresado es menor al monto pendiente de pago
+    if (monto < montoPendiente) {
+      return res.status(400).json({
+        ok: false,
+        msg: 'El monto ingresado es menor al monto pendiente de pago en la cuota.',
       });
     }
 
     // Actualizar el monto pagado de la cuota actual
     await db.query(
       `UPDATE cuotas_mensuales
-      SET monto_pagado = monto_a_pagar, estado = 'PA'
+      SET monto_pagado = monto_pagado + ${monto}, estado = 'PA'
       WHERE id = ${cuota_id}`
     );
+
+    const student = await db.query(`SELECT * FROM student WHERE student_id = ${cuota[0].student_id}`);
 
     return res.status(200).json({
       ok: true,
       msg: 'Pago registrado exitosamente',
+      student: student[0],
+      cuota: cuota[0]
     });
   } catch (err) {
     console.log('Error in registerPaymentCuota:', err);
@@ -404,10 +428,6 @@ const registerPaymentCuota = async (req, res) => {
     });
   }
 };
-
-
-
-
 
 module.exports = {
   find_all_students,
