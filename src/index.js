@@ -3,6 +3,8 @@ const express = require('express'),
       cors = require('cors'),
       { config } = require('dotenv');
 
+const configDb = require('../config');
+
       config();
 
 const PORT = process.env.PORT;
@@ -17,4 +19,5 @@ app.use('/api', require('./routes/main.routes'));
 
 app.listen(PORT, () => {
     console.log('API Running in port ==> ', PORT);
+    console.log(configDb)
 });
